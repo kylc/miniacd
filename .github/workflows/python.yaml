@@ -15,6 +15,9 @@ jobs:
           - os: ubuntu-24.04
             target: x86_64
             cross: false
+          - os: ubuntu-24.04-arm
+            target: aarch64
+            cross: false
           - os: macos-15
             target: universal2
             cross: false
