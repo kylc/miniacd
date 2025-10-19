@@ -15,7 +15,7 @@ extension-module = ["pyo3/extension-module"]
 [dependencies]
 ahash = "0.8.12"
 indicatif = "0.18.0"
-kiddo = { version = "5.2.2", features = ["simd"] }
+kiddo = "5.2.2"
 mimalloc = { version = "0.1.48", features = ["v3"] }
 nalgebra = { version = "0.34.1", features = ["rand"] }
 parry3d-f64 = { version = "0.25", features = ["parallel"] }
