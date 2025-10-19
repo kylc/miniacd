@@ -14,11 +14,20 @@
 
 ## Setup
 
+Run directly with [uv](https://docs.astral.sh/uv/):
+
 ``` sh
-pip install miniacd
+uvx miniacd --help
 ```
 
-Or, to install a prerelease version:
+Or, use pip to install into your local environment:
+
+``` sh
+pip install miniacd
+miniacd --help
+```
+
+Or, install a prerelease version:
 
 1. Download a recent `.whl` from [GitHub Releases](https://github.com/kylc/miniacd/releases)
 2. Run `pip install miniacd<...>.whl` (replace `<...>` with the actual filename)
