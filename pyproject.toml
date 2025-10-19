@@ -2,8 +2,7 @@
 name = "miniacd"
 description = "Approximate convex decomposition of 3D meshes"
 readme = "README.md"
-version = "0.1.1"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = "MIT OR Apache-2.0"
 authors = [
   {email = "kcesare@gmail.com"},
@@ -16,6 +15,7 @@ dependencies = [
   "click>=8.0.0",
   "trimesh>=4.0.0"
 ]
+dynamic = ["version"]
 
 [project.urls]
 homepage = "https://github.com/kylc/miniacd"
