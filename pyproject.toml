@@ -2,7 +2,7 @@
 name = "miniacd"
 description = "Approximate convex decomposition of 3D meshes"
 readme = "README.md"
-version = "0.1.0"
+version = "0.1.1"
 requires-python = ">=3.8"
 license = "MIT OR Apache-2.0"
 authors = [

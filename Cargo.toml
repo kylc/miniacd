@@ -2,7 +2,7 @@
 name = "miniacd"
 authors = ["Kyle Cesare <kcesare@gmail.com>"]
 description = "Approximate convex decomposition of 3D meshes"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 
