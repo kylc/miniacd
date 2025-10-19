@@ -1,0 +1,32 @@
+[project]
+name = "miniacd"
+description = "Approximate convex decomposition of 3D meshes"
+readme = "README.md"
+version = "0.1.0"
+requires-python = ">=3.8"
+license = "MIT OR Apache-2.0"
+authors = [
+  {email = "kcesare@gmail.com"},
+  {name = "Kyle Cesare"}
+]
+classifiers = [
+  "Topic :: Scientific/Engineering"
+]
+dependencies = [
+  "click>=8.0.0",
+  "trimesh>=4.0.0"
+]
+
+[project.urls]
+homepage = "https://github.com/kylc/miniacd"
+
+[project.scripts]
+miniacd = "miniacd.cli:main"
+
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+python-source = "python"
