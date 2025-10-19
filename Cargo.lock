@@ -787,7 +787,6 @@ dependencies = [
  "num-derive",
  "num-traits",
  "ordered-float",
- "rayon",
  "rstar",
  "simba",
  "slab",
