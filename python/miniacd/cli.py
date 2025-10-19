@@ -61,6 +61,12 @@ def random_rgb() -> tuple[int, int, int]:
     help="Monte Carlo tree search search iterations",
 )
 @click.option(
+    "--mcts-nodes",
+    default=20,
+    type=click.IntRange(min=0),
+    help="The discretization size in the Monte Carlo tree search",
+)
+@click.option(
     "--seed",
     default=42,
     type=click.IntRange(min=0),
@@ -75,6 +81,7 @@ def main(
     threshold: float,
     mcts_depth: int,
     mcts_iterations: int,
+    mcts_nodes: int,
     seed: int,
 ):
     """
@@ -89,6 +96,7 @@ def main(
         threshold=threshold,
         max_depth=mcts_depth,
         iterations=mcts_iterations,
+        num_nodes=mcts_nodes,
         random_seed=seed,
         print=True,
     )

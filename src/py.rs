@@ -41,6 +41,7 @@ mod pyminiacd {
                       threshold=0.1,
                       iterations=150,
                       max_depth=3,
+                      num_nodes=20,
                       random_seed=42,
                       print=true))]
     fn run(
@@ -48,6 +49,7 @@ mod pyminiacd {
         threshold: f64,
         iterations: usize,
         max_depth: usize,
+        num_nodes: usize,
         random_seed: u64,
         print: bool,
     ) -> Vec<PyMesh> {
@@ -56,7 +58,7 @@ mod pyminiacd {
             iterations,
             max_depth,
             exploration_param: f64::sqrt(2.0),
-            num_nodes: 20,
+            num_nodes,
             random_seed,
             print,
         };
