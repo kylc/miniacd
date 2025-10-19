@@ -14,13 +14,12 @@ jobs:
         include:
           - os: ubuntu-24.04
             target: x86_64
-            cross: false
           - os: ubuntu-24.04-arm
             target: aarch64
-            cross: false
           - os: macos-15
             target: universal2
-            cross: false
+          - os: windows-2025
+            target: x86_64
 
     steps:
       - name: checkout
@@ -43,10 +42,9 @@ jobs:
           pip3 install delocate
           delocate-wheel -v dist/*.whl
       - name: install built wheel
-        if: ${{ ! matrix.cross }}
         run: |
           pip3 install miniacd --find-links dist
-          python3 -c "import miniacd"
+          miniacd --help
       - name: upload wheels
         uses: actions/upload-artifact@v4
         with:

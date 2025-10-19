@@ -18,7 +18,7 @@ approx = "0.5.1"
 clap = { version = "4.5.49", features = ["cargo"] }
 indicatif = "0.18.0"
 kiddo = { version = "5.2.2", features = ["simd"] }
-mimalloc = "0.1.48"
+mimalloc = { version = "0.1.48", features = ["v3"] }
 nalgebra = { version = "0.34.1", features = ["rand"] }
 parry3d-f64 = { version = "0.25", features = ["parallel"] }
 pyo3 = { version = "0.26.0", features = ["abi3-py39", "extension-module"] }
