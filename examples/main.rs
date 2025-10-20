@@ -1,4 +1,4 @@
-use std::{env, path::PathBuf};
+use std::{env, path::PathBuf, time::Instant};
 
 use miniacd::{
     Config,
@@ -24,7 +24,11 @@ fn main() {
         ..Default::default()
     };
     let mesh = load_obj(input_path);
+
+    let t0 = Instant::now();
     let components = miniacd::run(mesh, &config);
+    let tf = Instant::now();
+    println!("main:\t{:.2}s", (tf - t0).as_secs_f64());
 
     // PARALLEL: compute the output convex hulls in parallel.
     let convex_meshes: Vec<Mesh> = components
