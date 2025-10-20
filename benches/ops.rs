@@ -9,7 +9,7 @@ use miniacd::{
 
 #[divan::bench]
 fn concavity_metric_approx(bencher: Bencher) {
-    let mesh = load_obj("benches/bunny.obj");
+    let mesh = &load_obj("benches/bunny.obj")[0];
     let hull = ops::convex_hull(&mesh);
     bencher.bench(|| {
         black_box(metric::concavity_metric(&mesh, &hull, false));
@@ -18,7 +18,7 @@ fn concavity_metric_approx(bencher: Bencher) {
 
 #[divan::bench]
 fn concavity_metric_exact(bencher: Bencher) {
-    let mesh = load_obj("benches/bunny.obj");
+    let mesh = &load_obj("benches/bunny.obj")[0];
     let hull = ops::convex_hull(&mesh);
     bencher.bench(|| {
         black_box(metric::concavity_metric(&mesh, &hull, true));
@@ -29,7 +29,7 @@ fn concavity_metric_exact(bencher: Bencher) {
 fn slice(bencher: Bencher) {
     const PLANE: CanonicalPlane = CanonicalPlane { axis: 2, bias: 0.0 };
 
-    let mesh = load_obj("benches/bunny.obj");
+    let mesh = &load_obj("benches/bunny.obj")[0];
     bencher.bench(|| {
         black_box(ops::slice(&mesh, &PLANE));
     });
@@ -37,7 +37,7 @@ fn slice(bencher: Bencher) {
 
 #[divan::bench]
 fn convex_hull(bencher: Bencher) {
-    let mesh = load_obj("benches/bunny.obj");
+    let mesh = &load_obj("benches/bunny.obj")[0];
     bencher.bench(|| {
         black_box(ops::convex_hull(&mesh));
     });
@@ -45,7 +45,7 @@ fn convex_hull(bencher: Bencher) {
 
 #[divan::bench]
 fn volume(bencher: Bencher) {
-    let mesh = load_obj("benches/bunny.obj");
+    let mesh = &load_obj("benches/bunny.obj")[0];
     bencher.bench(|| {
         black_box(ops::volume(&mesh));
     });
@@ -53,7 +53,7 @@ fn volume(bencher: Bencher) {
 
 #[divan::bench]
 fn bbox(bencher: Bencher) {
-    let mesh = load_obj("benches/bunny.obj");
+    let mesh = &load_obj("benches/bunny.obj")[0];
     bencher.bench(|| {
         black_box(ops::bbox(&mesh));
     });
@@ -61,7 +61,7 @@ fn bbox(bencher: Bencher) {
 
 #[divan::bench(sample_count = 3)]
 fn full_run(bencher: Bencher) {
-    let mesh = load_obj("benches/bunny.obj");
+    let mesh = &load_obj("benches/bunny.obj")[0];
     let config = miniacd::Config {
         print: false,
         ..Default::default()

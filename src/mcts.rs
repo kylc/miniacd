@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use rand::{Rng, SeedableRng};
+use rand::{
+    Rng, SeedableRng,
+    seq::{IndexedRandom, SliceRandom},
+};
 use rand_chacha::ChaCha8Rng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
@@ -38,16 +41,6 @@ impl Part {
     pub fn slice(&self, plane: CanonicalPlane) -> (Part, Part) {
         let (lhs, rhs) = ops::slice(&self.mesh, &plane);
 
-        let build_part = |mesh| {
-            let convex_hull = ops::convex_hull(&mesh);
-            Part {
-                bounds: ops::bbox(&mesh),
-                approx_concavity: concavity_metric(&mesh, &convex_hull, false),
-                mesh: Arc::new(mesh),
-                convex_hull: Arc::new(convex_hull),
-            }
-        };
-
         // PARALLEL: Computing the convex hull is the most expensive operation
         // in the pipeline, and this is an easy place to parallelize the lhs/rhs
         // computation.
@@ -55,7 +48,7 @@ impl Part {
         // TODO: is there some way to accelerate the convex hull calculation,
         // instead of recomputing from scratch for each side? We are slicing the
         // mesh by a plane, maybe we can also slice the hull?
-        rayon::join(|| build_part(lhs), || build_part(rhs))
+        rayon::join(|| Part::from_mesh(lhs), || Part::from_mesh(rhs))
     }
 }
 
@@ -63,13 +56,43 @@ impl Part {
 /// state part vector to be sliced at the given normalized slicing plane.
 #[derive(Copy, Clone)]
 pub struct Action {
-    pub part_idx: usize,
     pub unit_plane: CanonicalPlane,
+}
+
+impl Action {
+    fn new(unit_plane: CanonicalPlane) -> Self {
+        Self { unit_plane }
+    }
+}
+
+/// Computes all of the various slicing planes which can be used by the tree
+/// search. The worst part in the parts list is always operated on.
+///
+/// The number of slicing planes is dictated by the `num_nodes` parameter.
+///
+/// Returns a shuffled vector of actions.
+fn all_actions<R: Rng>(num_nodes: usize, rng: &mut R) -> Vec<Action> {
+    let mut actions: Vec<_> = (0..num_nodes)
+        .flat_map(|node_idx| {
+            (0..3).map(move |axis| {
+                // Splits should not occur right at the edge of the mesh
+                // (e.g. normalized bias=0.0 or bias=1.0) as they would
+                // be one-sided.
+                let ratio = (node_idx + 1) as f64 / (num_nodes + 1) as f64;
+
+                Action::new(CanonicalPlane { axis, bias: ratio })
+            })
+        })
+        .collect();
+
+    actions.shuffle(rng);
+    actions
 }
 
 /// The state at a particular node in the tree.
 #[derive(Clone)]
 struct MctsState {
+    /// Parts sorted by concavity in ascending order (worst is last).
     parts: Vec<Part>,
     parent_rewards: Vec<f64>,
     depth: usize,
@@ -78,45 +101,15 @@ struct MctsState {
 impl MctsState {
     /// Returns the index of the part with the highest concavity.
     fn worst_part_index(&self) -> usize {
-        (0..self.parts.len())
-            .max_by(|&a, &b| {
-                let ca = self.parts[a].approx_concavity;
-                let cb = self.parts[b].approx_concavity;
-                ca.total_cmp(&cb)
-            })
-            .expect("no parts")
-    }
-
-    /// Computes all of the various slicing planes which can be used by the tree
-    /// search. The worst part in the parts list is always operated on.
-    ///
-    /// The number of slicing planes is dictated by the `num_nodes` parameter.
-    fn all_actions(&self, num_nodes: usize) -> Vec<Action> {
-        let part_idx = self.worst_part_index();
-
-        (0..num_nodes)
-            .flat_map(|i| {
-                (0..3)
-                    .map(|axis| {
-                        // Splits should not occur right at the edge of the mesh
-                        // (e.g. normalized bias=0.0 or bias=1.0) as they would
-                        // be one-sided.
-                        let ratio = (i + 1) as f64 / (num_nodes + 1) as f64;
-
-                        Action {
-                            part_idx,
-                            unit_plane: CanonicalPlane { axis, bias: ratio },
-                        }
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .collect()
+        // Parts are kept in order such that the last element is the worst.
+        self.parts.len() - 1
     }
 
     /// Apply the given slicing plane to the current state, returning a new
-    /// state with one part replaced by two.
+    /// state with one part replaced by two. The worst part (by concavity) is
+    /// always chosen as the action target.
     fn step(&self, action: Action) -> Self {
-        let part_idx = action.part_idx;
+        let part_idx = self.worst_part_index();
         let part = &self.parts[part_idx];
 
         // Convert the slice ratio to an absolute bias.
@@ -130,8 +123,19 @@ impl MctsState {
             parts: {
                 let mut parts = self.parts.clone();
                 parts.remove(part_idx);
-                parts.push(lhs);
-                parts.push(rhs);
+
+                let mut insert_sorted = |part: Part| {
+                    let pos = parts
+                        .binary_search_by(|probe| {
+                            probe.approx_concavity.total_cmp(&part.approx_concavity)
+                        })
+                        .unwrap_or_else(|e| e);
+                    parts.insert(pos, part);
+                };
+
+                insert_sorted(lhs);
+                insert_sorted(rhs);
+
                 parts
             },
             parent_rewards: {
@@ -157,6 +161,10 @@ impl MctsState {
         let d = (self.parent_rewards.len() + 1) as f64;
         sum / d
     }
+
+    fn is_terminal(&self, max_depth: usize) -> bool {
+        self.depth >= max_depth
+    }
 }
 
 struct MctsNode {
@@ -172,8 +180,30 @@ struct MctsNode {
 }
 
 impl MctsNode {
-    fn depth(&self) -> usize {
-        self.state.depth
+    fn new(
+        state: MctsState,
+        actions: Vec<Action>,
+        action: Option<Action>,
+        parent: Option<usize>,
+    ) -> Self {
+        let q = state.reward();
+        Self {
+            state,
+            action,
+            parent,
+            children: vec![],
+            remaining_actions: actions,
+            n: 0,
+            q,
+        }
+    }
+
+    fn is_leaf(&self) -> bool {
+        !self.remaining_actions.is_empty()
+    }
+
+    fn is_terminal(&self, max_depth: usize) -> bool {
+        self.state.is_terminal(max_depth)
     }
 }
 
@@ -182,6 +212,73 @@ struct Mcts {
 }
 
 impl Mcts {
+    fn new(root: MctsNode) -> Self {
+        Mcts { nodes: vec![root] }
+    }
+
+    /// Select the leaf node with the highest UCB to explore next.
+    fn select(&self, c: f64) -> usize {
+        let mut v = 0;
+        loop {
+            let node = &self.nodes[v];
+            if node.is_leaf() {
+                return v;
+            }
+
+            v = self.best_child(v, c);
+        }
+    }
+
+    /// Expand the given node by choosing a random action from its list of
+    /// unplayed actions. Add the result as a child to this node.
+    fn expand<R: Rng>(&mut self, v: usize, num_nodes: usize, rng: &mut R) {
+        let random_action_idx = rng.random_range(..self.nodes[v].remaining_actions.len());
+        let random_action = self.nodes[v].remaining_actions.remove(random_action_idx);
+        let new_state = self.nodes[v].state.step(random_action);
+
+        self.nodes.push(MctsNode::new(
+            new_state,
+            all_actions(num_nodes, rng),
+            Some(random_action),
+            Some(v),
+        ));
+
+        let child = self.nodes.len() - 1;
+        self.nodes[v].children.push(child);
+    }
+
+    /// The default policy chooses the highest reward among splitting the part
+    /// directly at the center along one of the three axes. The game is played
+    /// out until the maximum depth is reached.
+    fn simulate(&self, v: usize, max_depth: usize) -> f64 {
+        let mut current_state = self.nodes[v].state.clone();
+        while !current_state.is_terminal(max_depth) {
+            let default_planes = [
+                CanonicalPlane { axis: 0, bias: 0.5 },
+                CanonicalPlane { axis: 1, bias: 0.5 },
+                CanonicalPlane { axis: 2, bias: 0.5 },
+            ];
+
+            // PARALLEL: evaluate the axes in parallel.
+            let (_, state_to_play) = default_planes
+                .into_par_iter()
+                .map(|plane| {
+                    let action = Action::new(plane);
+
+                    let new_state = current_state.step(action);
+                    let new_reward = new_state.reward();
+
+                    (new_reward, new_state)
+                })
+                .max_by(|a, b| a.0.total_cmp(&b.0))
+                .unwrap();
+
+            current_state = state_to_play;
+        }
+
+        current_state.quality()
+    }
+
     /// Upper confidence estimate of the given node's reward.
     fn ucb(&self, v: usize, c: f64) -> f64 {
         if self.nodes[v].n == 0 {
@@ -189,10 +286,11 @@ impl Mcts {
         }
 
         let node = &self.nodes[v];
+        let n = node.n as f64;
         let parent = &self.nodes[node.parent.unwrap()];
         let parent_n = parent.n as f64;
 
-        self.nodes[v].q + c * (2. * parent_n.ln() / self.nodes[v].n as f64).sqrt()
+        self.nodes[v].q + c * (2. * parent_n.ln() / n).sqrt()
     }
 
     /// The next child to explore, based on the tradeoff of exploration and
@@ -212,83 +310,8 @@ impl Mcts {
             .unwrap()
     }
 
-    /// The tree policy attempts to exhaust all of the slicing options for the
-    /// current index before moving on to explore new nodes.
-    fn tree_policy<R: Rng>(
-        &mut self,
-        mut v: usize,
-        d: usize,
-        c: f64,
-        num_nodes: usize,
-        rng: &mut R,
-    ) -> usize {
-        // TODO: it should be possible to parallelize the tree policy for a big
-        // overall speedup. See the parallelization in the default policy, for
-        // example.
-        while self.nodes[v].depth() < d {
-            if !self.nodes[v].remaining_actions.is_empty() {
-                // Choose a random slicing plane which has not been used before.
-                let remaining_actions = &mut self.nodes[v].remaining_actions;
-                let rand_idx = rng.random_range(0..remaining_actions.len());
-                let rand_action = remaining_actions.remove(rand_idx);
-
-                // Insert the result as a new node in the tree as a child of
-                // this node.
-                let next_state = self.nodes[v].state.step(rand_action);
-                self.nodes.push(MctsNode {
-                    remaining_actions: next_state.all_actions(num_nodes),
-                    q: next_state.reward(),
-                    state: next_state,
-                    action: Some(rand_action),
-                    parent: Some(v),
-                    children: vec![],
-                    n: 0,
-                });
-
-                let n = self.nodes.len();
-                self.nodes[v].children.push(n - 1);
-                return v;
-            } else {
-                v = self.best_child(v, c);
-            }
-        }
-
-        v
-    }
-
-    /// The default policy chooses the highest reward among splitting the part
-    /// directly at the center along one of the three axes.
-    fn default_policy(&self, v: usize, d: usize) -> MctsState {
-        let mut state = self.nodes[v].state.clone();
-
-        while state.depth < d {
-            let part_idx = state.worst_part_index();
-
-            // PARALLEL: evaluate the axes in parallel.
-            let (_, new_state) = (0..3)
-                .into_par_iter()
-                .map(|axis| {
-                    let action = Action {
-                        part_idx,
-                        unit_plane: CanonicalPlane { axis, bias: 0.5 },
-                    };
-
-                    let new_state = state.step(action);
-                    let new_reward = new_state.reward();
-
-                    (new_reward, new_state)
-                })
-                .max_by(|a, b| a.0.total_cmp(&b.0))
-                .unwrap();
-
-            state = new_state;
-        }
-
-        state
-    }
-
     /// Propagate rewards at the leaf nodes back up through the tree.
-    fn backup(&mut self, mut v: usize, q: f64) {
+    fn backprop(&mut self, mut v: usize, q: f64) {
         // Move upward until the root node is reached.
         loop {
             self.nodes[v].n += 1;
@@ -328,15 +351,8 @@ pub fn refine(
     while (ub - lb) > EPS {
         let pivot = (lb + ub) / 2.0;
 
-        let lhs = Action {
-            part_idx: 0,
-            unit_plane: initial_unit_plane.with_bias((lb + pivot) / 2.),
-        };
-
-        let rhs = Action {
-            part_idx: 0,
-            unit_plane: initial_unit_plane.with_bias((ub + pivot) / 2.),
-        };
+        let lhs = Action::new(initial_unit_plane.with_bias((lb + pivot) / 2.));
+        let rhs = Action::new(initial_unit_plane.with_bias((ub + pivot) / 2.));
 
         if state.step(lhs).reward() > state.step(rhs).reward() {
             // Move left
@@ -361,34 +377,29 @@ pub fn run(input_part: Part, config: &Config) -> Option<CanonicalPlane> {
     // A deterministic random number generator.
     let mut rng = ChaCha8Rng::seed_from_u64(config.random_seed);
 
-    let root_state = MctsState {
-        parts: vec![input_part],
-        parent_rewards: vec![],
-        depth: 0,
-    };
-    let root_node = MctsNode {
-        state: root_state.clone(),
-        parent: None,
-        action: None,
-        remaining_actions: root_state.all_actions(config.num_nodes),
-        children: vec![],
-        n: 0,
-        q: f64::NEG_INFINITY,
-    };
+    let root_node = MctsNode::new(
+        MctsState {
+            parts: vec![input_part],
+            parent_rewards: vec![],
+            depth: 0,
+        },
+        all_actions(config.num_nodes, &mut rng),
+        None,
+        None,
+    );
 
-    let mut mcts = Mcts {
-        nodes: vec![root_node],
-    };
+    let mut mcts = Mcts::new(root_node);
     for _ in 0..config.iterations {
-        let v = mcts.tree_policy(
-            0,
-            config.max_depth,
-            config.exploration_param,
-            config.num_nodes,
-            &mut rng,
-        );
-        let state = mcts.default_policy(v, config.max_depth);
-        mcts.backup(v, state.quality());
+        let mut v = mcts.select(config.exploration_param);
+
+        if !mcts.nodes[v].is_terminal(config.max_depth) {
+            mcts.expand(v, config.num_nodes, &mut rng);
+            let children = &mcts.nodes[v].children;
+            v = *children.choose(&mut rng).unwrap();
+        }
+
+        let reward = mcts.simulate(v, config.max_depth);
+        mcts.backprop(v, reward);
     }
 
     // For the final result, we only care about the best node. We never want to

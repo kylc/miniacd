@@ -23,7 +23,8 @@ fn main() {
         print: true,
         ..Default::default()
     };
-    let mesh = load_obj(input_path);
+    let meshes = load_obj(input_path);
+    let mesh = meshes[0].clone(); // TODO: support multiple objects
 
     let t0 = Instant::now();
     let components = miniacd::run(mesh, &config);

@@ -110,7 +110,7 @@ fn hausdorff_element(a: &[PointInTriangle], b: &[PointInTriangle]) -> f64 {
     // For each vertex a ∈ Sample(A), compute the minimum distance to B. The
     // Hausdorff distance from A to B is the supremum of these minimums.
     a.iter()
-        .map(|a_sample| {
+        .flat_map(|a_sample| {
             // Find the point on the surface of B which is closest to a.
             let a_pt = a_sample.1;
 
@@ -125,10 +125,9 @@ fn hausdorff_element(a: &[PointInTriangle], b: &[PointInTriangle]) -> f64 {
                     tri_in_b.distance_to_local_point(&a_pt, true)
                 })
                 .min_by(|a, b| a.total_cmp(b))
-                .unwrap_or(f64::INFINITY)
         })
         .max_by(|a, b| a.total_cmp(b))
-        .unwrap_or(f64::NEG_INFINITY)
+        .unwrap_or(0.0)
 }
 
 /// Wei et al. 2022, section (4)

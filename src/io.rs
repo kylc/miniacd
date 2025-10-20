@@ -11,7 +11,7 @@ use rand_chacha::ChaCha8Rng;
 
 use crate::mesh::Mesh;
 
-pub fn load_obj<P: AsRef<Path> + Debug>(path: P) -> Mesh {
+pub fn load_obj<P: AsRef<Path> + Debug>(path: P) -> Vec<Mesh> {
     let (models, _) = tobj::load_obj(
         path,
         &tobj::LoadOptions {
@@ -22,22 +22,26 @@ pub fn load_obj<P: AsRef<Path> + Debug>(path: P) -> Mesh {
     )
     .expect("invalid obj mesh");
 
-    // TODO: multiple objects
-    let mesh = &models[0].mesh;
+    models
+        .into_iter()
+        .map(|model| {
+            let vertices: Vec<Point3<f64>> = model
+                .mesh
+                .positions
+                .chunks_exact(3)
+                .map(|v| Point3::new(v[0] as f64, v[1] as f64, v[2] as f64))
+                .collect();
 
-    let vertices: Vec<Point3<f64>> = mesh
-        .positions
-        .chunks_exact(3)
-        .map(|v| Point3::new(v[0] as f64, v[1] as f64, v[2] as f64))
-        .collect();
+            let faces: Vec<[u32; 3]> = model
+                .mesh
+                .indices
+                .chunks_exact(3)
+                .map(|i| [i[0], i[1], i[2]])
+                .collect();
 
-    let faces: Vec<[u32; 3]> = mesh
-        .indices
-        .chunks_exact(3)
-        .map(|i| [i[0], i[1], i[2]])
-        .collect();
-
-    Mesh { vertices, faces }
+            Mesh { vertices, faces }
+        })
+        .collect()
 }
 
 fn random_rgb<R: Rng>(rng: &mut R) -> (f32, f32, f32) {

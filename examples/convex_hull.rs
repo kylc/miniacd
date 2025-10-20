@@ -9,7 +9,8 @@ const N: u128 = 100;
 
 fn main() {
     let input_path = args().next_back().expect("no input mesh");
-    let mesh = load_obj(input_path);
+    let meshes = load_obj(input_path);
+    let mesh = meshes[0].clone(); // TODO: support multiple objects
 
     let t0 = Instant::now();
     for _ in 0..N {

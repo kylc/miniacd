@@ -46,12 +46,14 @@ impl Mesh {
         })
     }
 
+    /// Transform such that the mesh is centered and on the range (-1, 1) along
+    /// the longest extent.
     pub fn normalization_transform(&self) -> Matrix4<f64> {
         let bbox = ops::bbox(self);
 
         let tfm = Matrix4::identity();
         let tfm = tfm.append_translation(&-bbox.center());
-        tfm.append_nonuniform_scaling(&bbox.extent().map(|v| 1. / v))
+        tfm.append_scaling(2. / bbox.extent().max())
     }
 
     pub fn transform(self, tfm: &Matrix4<f64>) -> Mesh {
