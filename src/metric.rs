@@ -65,10 +65,6 @@ struct PointInTriangle(Triangle, Point3<f64>);
 /// The number of points is determined by the total surface area divided by the
 /// resolution.
 fn sample<R: Rng>(mesh: &Mesh, resolution: f64, rng: &mut R) -> Vec<PointInTriangle> {
-    if mesh.is_empty() {
-        return vec![];
-    }
-
     let mut total_area = 0.0;
 
     // Compute a distribution weighted by face area.
@@ -77,6 +73,10 @@ fn sample<R: Rng>(mesh: &Mesh, resolution: f64, rng: &mut R) -> Vec<PointInTrian
         let area = triangle.area();
         weights.push(area);
         total_area += area;
+    }
+
+    if total_area == 0.0 {
+        return vec![];
     }
 
     let n_samples = usize::max(MIN_SAMPLES, (total_area * resolution) as usize);
