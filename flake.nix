@@ -15,7 +15,7 @@
       in {
         packages.default = naersk-lib.buildPackage ./.;
         devShells.default = with pkgs;
-          mkShell {
+          mkShell rec {
             buildInputs = [
               # Rust toolchain
               fenix-pkgs.latest.toolchain
@@ -40,6 +40,7 @@
             ];
             RUST_SRC_PATH =
               "${fenix-pkgs.latest.rust-src}/lib/rustlib/src/rust/library";
+            PYO3_PYTHON = "${python3}/bin/python3";
             venvDir = "./.venv";
           };
       });
