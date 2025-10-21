@@ -19,7 +19,7 @@ const RV_K: f64 = 0.3;
 
 /// The number of samples per unit of surface area for computing the Hausdorff
 /// distance.
-const SAMPLING_RESOLUTION: f64 = 2000.0;
+const SAMPLING_RESOLUTION: f64 = 3000.0;
 
 /// The minimum number of samples to be considered when computing the Hausdorff
 /// distance.
