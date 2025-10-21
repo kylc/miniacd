@@ -29,18 +29,16 @@ def random_rgb() -> tuple[int, int, int]:
 )
 @click.argument("input-file", type=click.Path(exists=True, dir_okay=False))
 @click.option(
-    "--output-dir",
-    default=".",
-    type=click.Path(exists=True, file_okay=False),
-    help="Directory to save output mesh files",
+    "--output-path",
+    default="output.obj",
+    type=click.Path(dir_okay=False),
+    help="Output file path with extension",
 )
 @click.option(
-    "--output-format", default="obj", help="File extension for saving part meshes"
-)
-@click.option(
-    "--output-combined",
-    default=True,
-    help="Output a single mesh file with multiple internal objects",
+    "--output-split",
+    default=False,
+    is_flag=True,
+    help="Output separate mesh files for each convex part",
 )
 @click.option(
     "--threshold",
@@ -68,16 +66,15 @@ def random_rgb() -> tuple[int, int, int]:
 )
 @click.option(
     "--seed",
-    default=42,
+    default=0,
     type=click.IntRange(min=0),
     help="Random generator seed for deterministic output",
 )
 @click.version_option()
 def main(
     input_file: str,
-    output_format: str,
-    output_combined: bool,
-    output_dir: str,
+    output_path: str,
+    output_split: bool,
     threshold: float,
     mcts_depth: int,
     mcts_iterations: int,
@@ -113,14 +110,12 @@ def main(
     ]
 
     # Output a single file of multiple objects or multiple files.
-    output_stem = Path(input_file).stem + "_convex"
-    if output_combined:
-        output_path = Path(output_dir) / f"{output_stem}.{output_format}"
-        trimesh.Scene(output_parts).export(output_path)
-    else:
+    output_path = Path(output_path)
+    if output_split:
         for i, part in enumerate(output_parts):
-            output_path = Path(output_dir) / f"{output_stem}_{i}.{output_format}"
-            part.export(output_path)
+            part.export(output_path.with_stem(output_path.stem + f"_{i}"))
+    else:
+        trimesh.Scene(output_parts).export(output_path)
 
 
 if __name__ == "__main__":
