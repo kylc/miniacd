@@ -124,5 +124,6 @@ pub fn run(input: Mesh, config: &Config) -> Vec<Part> {
     output_parts
         .into_iter()
         .map(|p| Part::from_mesh(Arc::unwrap_or_clone(p.mesh).transform(&normalization_tfm_inv)))
+        .filter(|p| !p.mesh.is_empty())
         .collect()
 }
