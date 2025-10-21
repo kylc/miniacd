@@ -6,7 +6,7 @@ pub mod ops;
 pub mod py;
 pub mod util;
 
-use std::{sync::Arc, time::Duration};
+use std::{f64, sync::Arc, time::Duration};
 
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressFinish, ProgressStyle};
 use mcts::Part;
@@ -18,6 +18,10 @@ use mimalloc::MiMalloc;
 // decrease in overall runtime.
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
+
+/// Tolerance for the change in threshold between successive cuts at which to
+/// give up, as no forward progress is being made.
+const TOLERANCE_DIFF: f64 = 1e-10;
 
 pub struct Config {
     /// The minimum acceptable concavity metric for an individual part to be
@@ -50,7 +54,7 @@ impl Default for Config {
     }
 }
 
-fn run_inner(input: Part, config: &Config, progress: &ProgressBar) -> Vec<Part> {
+fn run_inner(input: Part, config: &Config, progress: &ProgressBar, prev_cost: f64) -> Vec<Part> {
     // Base case: the input mesh already meets the threshold, so no further
     // slicing is necessary.
     //
@@ -58,7 +62,7 @@ fn run_inner(input: Part, config: &Config, progress: &ProgressBar) -> Vec<Part> 
     // distance calculation), whereas the inner loops will use the cheaper
     // approximation.
     let cost = concavity_metric(&input.mesh, &input.convex_hull, true);
-    if cost < config.threshold {
+    if cost < config.threshold || (cost - prev_cost).abs() < TOLERANCE_DIFF {
         progress.inc(1);
         return vec![input];
     }
@@ -89,8 +93,8 @@ fn run_inner(input: Part, config: &Config, progress: &ProgressBar) -> Vec<Part> 
     // could generate any number of parts.
     progress.inc_length(1);
     let (mut components_l, mut components_r) = rayon::join(
-        || run_inner(refined_l, config, progress),
-        || run_inner(refined_r, config, progress),
+        || run_inner(lhs, config, progress, cost),
+        || run_inner(rhs, config, progress, cost),
     );
 
     let mut components = vec![];
@@ -122,7 +126,7 @@ pub fn run(input: Mesh, config: &Config) -> Vec<Part> {
 
     // Run the slicing algorithm.
     let initial_part = Part::from_mesh(normalized_input);
-    let output_parts = run_inner(initial_part, config, &progress_bar);
+    let output_parts = run_inner(initial_part, config, &progress_bar, f64::INFINITY);
 
     // Unapply the transform so the outputs part positions match the input.
     output_parts
