@@ -68,21 +68,13 @@ fn run_inner(input: Part, config: &Config, progress: &ProgressBar, prev_cost: f6
     }
 
     // Further slicing is necessary. Run the tree search to find the slice plane
-    // which maximizes the future reward. Because the search is discretized,
-    // this is only a coarse estimate of the best slice plane.
-    let coarse_plane = mcts::run(input.clone(), config).expect("no action");
-
-    // Run the refinement step on the chosen slice. The radius specifies the
-    // maximum amount of adjustment in either direction. We allow refinement of
-    // up two one grid width of the MCTS search.
-    let refine_radius = 1. / (config.num_nodes + 1) as f64;
-    let refine_plane = mcts::refine(&input, coarse_plane, refine_radius);
-
-    let slice_plane = refine_plane.unwrap_or(coarse_plane).denormalize(
-        input.bounds.min[coarse_plane.axis],
-        input.bounds.max[coarse_plane.axis],
+    // which maximizes the future reward and also refine a more precise plane.
+    let optimal_plane = mcts::run(&input, config).expect("no action");
+    let abs_optimal_plane = optimal_plane.denormalize(
+        input.bounds.min[optimal_plane.axis],
+        input.bounds.max[optimal_plane.axis],
     );
-    let (refined_l, refined_r) = input.slice(slice_plane);
+    let (lhs, rhs) = input.slice(abs_optimal_plane);
 
     // The input mesh is no longer required. Drop it to save on memory usage.
     drop(input);

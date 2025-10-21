@@ -147,6 +147,38 @@ impl MctsState {
         }
     }
 
+    /// The default policy chooses the highest reward among splitting the part
+    /// directly at the center along three axes. The policy is rolled out until
+    /// the maximum depth is reached.
+    fn simulate(&self, max_depth: usize) -> f64 {
+        let default_planes = [
+            CanonicalPlane { axis: 0, bias: 0.5 },
+            CanonicalPlane { axis: 1, bias: 0.5 },
+            CanonicalPlane { axis: 2, bias: 0.5 },
+        ];
+
+        let mut current_state = self.clone();
+        while !current_state.is_terminal(max_depth) {
+            // PARALLEL: evaluate the axes in parallel.
+            let (_, state_to_play) = default_planes
+                .into_par_iter()
+                .map(|plane| {
+                    let action = Action::new(plane);
+
+                    let new_state = current_state.step(action);
+                    let new_reward = new_state.reward();
+
+                    (new_reward, new_state)
+                })
+                .max_by(|a, b| a.0.total_cmp(&b.0))
+                .unwrap();
+
+            current_state = state_to_play;
+        }
+
+        current_state.quality()
+    }
+
     /// The reward is the inverse of the concavity of the worst part, i.e. a
     /// smaller concavity gives a higher reward. We aim to maximize the reward.
     fn reward(&self) -> f64 {
@@ -225,7 +257,9 @@ impl Mcts {
                 return v;
             }
 
-            v = self.best_child(v, c);
+            v = self
+                .best_child(v, c)
+                .expect("selected leaf node must have parent");
         }
     }
 
@@ -247,38 +281,6 @@ impl Mcts {
         self.nodes[v].children.push(child);
     }
 
-    /// The default policy chooses the highest reward among splitting the part
-    /// directly at the center along one of the three axes. The game is played
-    /// out until the maximum depth is reached.
-    fn simulate(&self, v: usize, max_depth: usize) -> f64 {
-        let mut current_state = self.nodes[v].state.clone();
-        while !current_state.is_terminal(max_depth) {
-            let default_planes = [
-                CanonicalPlane { axis: 0, bias: 0.5 },
-                CanonicalPlane { axis: 1, bias: 0.5 },
-                CanonicalPlane { axis: 2, bias: 0.5 },
-            ];
-
-            // PARALLEL: evaluate the axes in parallel.
-            let (_, state_to_play) = default_planes
-                .into_par_iter()
-                .map(|plane| {
-                    let action = Action::new(plane);
-
-                    let new_state = current_state.step(action);
-                    let new_reward = new_state.reward();
-
-                    (new_reward, new_state)
-                })
-                .max_by(|a, b| a.0.total_cmp(&b.0))
-                .unwrap();
-
-            current_state = state_to_play;
-        }
-
-        current_state.quality()
-    }
-
     /// Upper confidence estimate of the given node's reward.
     fn ucb(&self, v: usize, c: f64) -> f64 {
         if self.nodes[v].n == 0 {
@@ -294,20 +296,15 @@ impl Mcts {
     }
 
     /// The next child to explore, based on the tradeoff of exploration and
-    /// exploitation.
-    fn best_child(&self, v: usize, c: f64) -> usize {
+    /// exploitation. Returns None if there are no children of v.
+    fn best_child(&self, v: usize, c: f64) -> Option<usize> {
         let node = &self.nodes[v];
-        assert!(!node.children.is_empty());
 
-        node.children
-            .iter()
-            .copied()
-            .max_by(|&a, &b| {
-                let ucb_a = self.ucb(a, c);
-                let ucb_b = self.ucb(b, c);
-                ucb_a.total_cmp(&ucb_b)
-            })
-            .unwrap()
+        node.children.iter().copied().max_by(|&a, &b| {
+            let ucb_a = self.ucb(a, c);
+            let ucb_b = self.ucb(b, c);
+            ucb_a.total_cmp(&ucb_b)
+        })
     }
 
     /// Propagate rewards at the leaf nodes back up through the tree.
@@ -324,48 +321,90 @@ impl Mcts {
             }
         }
     }
+
+    /// Returns the action path from the root to the highest reward terminal
+    /// node.
+    fn best_path_from_root(&self) -> Vec<Action> {
+        let mut best_path = vec![];
+        let mut v = 0;
+        while let Some(child) = self.best_child(v, 0.0) {
+            if let Some(action) = self.nodes[child].action {
+                best_path.push(action);
+            }
+
+            v = child;
+        }
+
+        best_path
+    }
+}
+
+/// Compute the quality for a path starting at initial_state, with the first
+/// action as replace_initial_action, and the remaining actions as actions[1..].
+///
+/// Used for refinement to determine if a first step replacement results in a
+/// high quality path.
+fn quality_for_path(
+    initial_state: &MctsState,
+    actions: &[Action],
+    replace_initial_action: Action,
+    max_depth: usize,
+) -> f64 {
+    let mut state = initial_state.clone();
+    let mut actions = actions.to_vec();
+    actions[0] = replace_initial_action;
+
+    for action in actions {
+        state = state.step(action);
+    }
+    state.simulate(max_depth)
 }
 
 /// Binary search for a refined cutting plane. Iteratively try cutting the input
-/// to the left and to the right of the initial plane. Whichever cut side
-/// results in a higher reward is recursively refined.
-pub fn refine(
-    input_part: &Part,
-    initial_unit_plane: CanonicalPlane,
+/// to the left and to the right of the initial plane.
+///
+/// To evaluate the cut, the quality of the entire path with the first cut
+/// replaced by the left or right hand side from above is simulated. This
+/// prevents the refinement from being too greedy and reducing future reward.
+fn refine(
+    initial_state: &MctsState,
+    initial_path: &[Action],
     unit_radius: f64,
-) -> Option<CanonicalPlane> {
-    const EPS: f64 = 1e-5;
+    max_depth: usize,
+) -> CanonicalPlane {
+    // Each iteration cuts the search plane in half, so even in the worst case
+    // (traversing the entire unit interval) this should converge in ~20 steps.
+    const EPS: f64 = 1e-6;
 
-    let state = MctsState {
-        parts: vec![input_part.clone()],
-        parent_rewards: vec![],
-        depth: 0,
-    };
+    let initial_action = initial_path[0];
+    let initial_unit_plane = initial_action.unit_plane;
 
     let mut lb = initial_unit_plane.bias - unit_radius;
     let mut ub = initial_unit_plane.bias + unit_radius;
-    let mut best_action = None;
+    let mut best_action = initial_action;
 
-    // Each iteration cuts the search plane in half, so even in the worst case
-    // (traversing the entire unit interval) this should converge in ~20 steps.
+    // Iterate until convergence.
     while (ub - lb) > EPS {
         let pivot = (lb + ub) / 2.0;
 
         let lhs = Action::new(initial_unit_plane.with_bias((lb + pivot) / 2.));
         let rhs = Action::new(initial_unit_plane.with_bias((ub + pivot) / 2.));
 
-        if state.step(lhs).reward() > state.step(rhs).reward() {
+        // Is left or right better?
+        if quality_for_path(initial_state, initial_path, lhs, max_depth)
+            > quality_for_path(initial_state, initial_path, rhs, max_depth)
+        {
             // Move left
             ub = pivot;
-            best_action = Some(lhs);
+            best_action = lhs;
         } else {
             // Move right
             lb = pivot;
-            best_action = Some(rhs);
+            best_action = rhs;
         }
     }
 
-    best_action.map(|a| a.unit_plane)
+    best_action.unit_plane
 }
 
 /// An implementation of Monte Carlo Tree Search for the approximate convex
@@ -373,13 +412,14 @@ pub fn refine(
 ///
 /// A run of the tree search returns the slice with the highest estimated
 /// probability to lead to a large reward when followed by more slices.
-pub fn run(input_part: Part, config: &Config) -> Option<CanonicalPlane> {
+pub fn run(input_part: &Part, config: &Config) -> Option<CanonicalPlane> {
     // A deterministic random number generator.
     let mut rng = ChaCha8Rng::seed_from_u64(config.random_seed);
 
+    // The root MCTS node contains just the input part, unmodified.
     let root_node = MctsNode::new(
         MctsState {
-            parts: vec![input_part],
+            parts: vec![input_part.clone()],
             parent_rewards: vec![],
             depth: 0,
         },
@@ -388,6 +428,8 @@ pub fn run(input_part: Part, config: &Config) -> Option<CanonicalPlane> {
         None,
     );
 
+    // Run the MCTS algorithm for the specified compute time to compute a
+    // probabilistic best path.
     let mut mcts = Mcts::new(root_node);
     for _ in 0..config.iterations {
         let mut v = mcts.select(config.exploration_param);
@@ -398,12 +440,24 @@ pub fn run(input_part: Part, config: &Config) -> Option<CanonicalPlane> {
             v = *children.choose(&mut rng).unwrap();
         }
 
-        let reward = mcts.simulate(v, config.max_depth);
+        let reward = mcts.nodes[v].state.simulate(config.max_depth);
         mcts.backprop(v, reward);
     }
 
-    // For the final result, we only care about the best node. We never want to
-    // return an exploratory node. Set the exploration parameter to zero.
-    let best_node = &mcts.nodes[mcts.best_child(0, 0.0)];
-    best_node.action.map(|a| a.unit_plane)
+    // Take the discrete best path from MCTS and refine it.
+    let best_path = mcts.best_path_from_root();
+    if !best_path.is_empty() {
+        let refined_plane = refine(
+            // Start the refinement from the root state, i.e. just the input
+            // part.
+            &mcts.nodes[0].state,
+            &best_path,
+            // TODO: use one node width scaled to mesh bbox
+            1.0,
+            config.max_depth,
+        );
+        Some(refined_plane)
+    } else {
+        None
+    }
 }
