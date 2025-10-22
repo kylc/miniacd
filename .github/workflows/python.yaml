@@ -43,7 +43,8 @@ jobs:
           delocate-wheel -v dist/*.whl
       - name: install built wheel
         run: |
-          pip3 install miniacd --find-links dist
+          pip3 install click>=8.0.0 trimesh>=4.0.0
+          pip3 install --no-index --find-links dist/ miniacd
           miniacd --help
       - name: upload wheels
         uses: actions/upload-artifact@v4
