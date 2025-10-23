@@ -12,6 +12,7 @@ use rand::{
     distr::{Distribution, weighted::WeightedIndex},
 };
 use rand_chacha::ChaCha8Rng;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{mesh::Mesh, ops};
 
@@ -109,19 +110,22 @@ fn hausdorff_element(a: &[PointInTriangle], b: &[PointInTriangle]) -> f64 {
 
     // For each vertex a ∈ Sample(A), compute the minimum distance to B. The
     // Hausdorff distance from A to B is the supremum of these minimums.
-    a.iter()
+    //
+    // PARALLEL: Executing the outer loops in parallel provides a nice speedup
+    // since the KD-tree lookup and triangle distance test are quite expensive.
+    a.into_par_iter()
         .flat_map(|a_sample| {
             // Find the point on the surface of B which is closest to a.
             let a_pt = a_sample.1;
 
             // The closest point in B is probably within one of the faces of the
             // nearest N vertices.
-            let b_samples =
-                b_index.nearest_n::<SquaredEuclidean>(&[a_pt.x, a_pt.y, a_pt.z], N_LOOKUP);
-            b_samples
+            b_index
+                .nearest_n::<SquaredEuclidean>(&[a_pt.x, a_pt.y, a_pt.z], N_LOOKUP)
                 .into_iter()
                 .map(|b_sample| {
-                    let tri_in_b = b[b_sample.item as usize].0;
+                    let tri_in_b = &b[b_sample.item as usize].0;
+
                     tri_in_b.distance_to_local_point(&a_pt, true)
                 })
                 .min_by(|a, b| a.total_cmp(b))
