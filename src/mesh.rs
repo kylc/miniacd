@@ -46,6 +46,20 @@ impl Mesh {
         })
     }
 
+    /// Merge the vertices and faces from a mesh into this one.
+    pub fn merge(&mut self, mut other: Mesh) {
+        let offset = self.vertices.len() as u32;
+
+        // Vertices from the second mesh are tacked on to the end of the vertex
+        // buffer.
+        self.vertices.append(&mut other.vertices);
+
+        // Indices from the second mesh must be offset to point to the new
+        // vertex locations in the combined mesh.
+        self.faces
+            .extend(other.faces.into_iter().map(|f| f.map(|f| f + offset)));
+    }
+
     /// Transform such that the mesh is centered and on the range (-1, 1) along
     /// the longest extent.
     pub fn normalization_transform(&self) -> Matrix4<f64> {
