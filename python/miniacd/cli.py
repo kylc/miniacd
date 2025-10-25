@@ -47,25 +47,25 @@ def random_rgb() -> tuple[int, int, int]:
     help="Concavity threshold at which mesh parts will be accepted",
 )
 @click.option(
-    "--mcts-depth",
-    default=3,
-    type=click.IntRange(min=0),
-    help="Monte Carlo tree search search depth",
-)
-@click.option(
     "--mcts-iterations",
     default=150,
     type=click.IntRange(min=0),
     help="Monte Carlo tree search search iterations",
 )
 @click.option(
-    "--mcts-nodes",
+    "--mcts-depth",
+    default=3,
+    type=click.IntRange(min=1),
+    help="Monte Carlo tree search search depth",
+)
+@click.option(
+    "--mcts-grid-nodes",
     default=20,
-    type=click.IntRange(min=0),
+    type=click.IntRange(min=1),
     help="The discretization size in the Monte Carlo tree search",
 )
 @click.option(
-    "--seed",
+    "--mcts-random-seed",
     default=0,
     type=click.IntRange(min=0),
     help="Random generator seed for deterministic output",
@@ -78,8 +78,8 @@ def main(
     threshold: float,
     mcts_depth: int,
     mcts_iterations: int,
-    mcts_nodes: int,
-    seed: int,
+    mcts_grid_nodes: int,
+    mcts_random_seed: int,
 ):
     """
     miniacd decomposes watertight 3D meshes into convex components
@@ -91,10 +91,10 @@ def main(
     parts = miniacd.run(
         mesh,
         threshold=threshold,
-        max_depth=mcts_depth,
-        iterations=mcts_iterations,
-        num_nodes=mcts_nodes,
-        random_seed=seed,
+        mcts_depth=mcts_depth,
+        mcts_iterations=mcts_iterations,
+        mcts_grid_nodes=mcts_grid_nodes,
+        mcts_random_seed=mcts_random_seed,
         print=True,
     )
 

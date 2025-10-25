@@ -27,15 +27,19 @@ pub struct Config {
     /// The minimum acceptable concavity metric for an individual part to be
     /// accepted.
     pub threshold: f64,
-    /// The number of samples taken from the MCTS before choosing a move.
-    pub iterations: usize,
+    /// The number of iterations taken for each MCTS step which chooses a single
+    /// slicing plane.
+    pub mcts_iterations: usize,
     /// The depth of the MCTS, i.e. the number of lookahead moves when deciding
     /// on the next move.
-    pub max_depth: usize,
-    pub exploration_param: f64,
+    pub mcts_depth: usize,
+    /// The exploration parameter for computing the upper confidence bound
+    /// (UCB).
+    pub mcts_exploration: f64,
     /// The number of discrete slices taken per axis at each node in the MCTS.
-    pub num_nodes: usize,
-    pub random_seed: u64,
+    pub mcts_grid_nodes: usize,
+    /// A seed for the deterministic RNG.
+    pub mcts_random_seed: u64,
     /// Print the progress bar? Enable for human users, disable for tests etc.
     pub print: bool,
 }
@@ -44,11 +48,11 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             threshold: 0.1,
-            iterations: 150,
-            max_depth: 3,
-            exploration_param: f64::sqrt(2.0),
-            num_nodes: 20,
-            random_seed: 0,
+            mcts_iterations: 150,
+            mcts_depth: 3,
+            mcts_exploration: f64::sqrt(2.0),
+            mcts_grid_nodes: 20,
+            mcts_random_seed: 0,
             print: false,
         }
     }

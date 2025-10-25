@@ -414,7 +414,7 @@ fn refine(
 /// probability to lead to a large reward when followed by more slices.
 pub fn run(input_part: &Part, config: &Config) -> Option<CanonicalPlane> {
     // A deterministic random number generator.
-    let mut rng = ChaCha8Rng::seed_from_u64(config.random_seed);
+    let mut rng = ChaCha8Rng::seed_from_u64(config.mcts_random_seed);
 
     // The root MCTS node contains just the input part, unmodified.
     let root_node = MctsNode::new(
@@ -423,7 +423,7 @@ pub fn run(input_part: &Part, config: &Config) -> Option<CanonicalPlane> {
             parent_rewards: vec![],
             depth: 0,
         },
-        all_actions(config.num_nodes, &mut rng),
+        all_actions(config.mcts_grid_nodes, &mut rng),
         None,
         None,
     );
@@ -431,16 +431,16 @@ pub fn run(input_part: &Part, config: &Config) -> Option<CanonicalPlane> {
     // Run the MCTS algorithm for the specified compute time to compute a
     // probabilistic best path.
     let mut mcts = Mcts::new(root_node);
-    for _ in 0..config.iterations {
-        let mut v = mcts.select(config.exploration_param);
+    for _ in 0..config.mcts_iterations {
+        let mut v = mcts.select(config.mcts_exploration);
 
-        if !mcts.nodes[v].is_terminal(config.max_depth) {
-            mcts.expand(v, config.num_nodes, &mut rng);
+        if !mcts.nodes[v].is_terminal(config.mcts_depth) {
+            mcts.expand(v, config.mcts_grid_nodes, &mut rng);
             let children = &mcts.nodes[v].children;
             v = *children.choose(&mut rng).unwrap();
         }
 
-        let reward = mcts.nodes[v].state.simulate(config.max_depth);
+        let reward = mcts.nodes[v].state.simulate(config.mcts_depth);
         mcts.backprop(v, reward);
     }
 
@@ -454,7 +454,7 @@ pub fn run(input_part: &Part, config: &Config) -> Option<CanonicalPlane> {
             &best_path,
             // TODO: use one node width scaled to mesh bbox
             1.0,
-            config.max_depth,
+            config.mcts_depth,
         );
         Some(refined_plane)
     } else {

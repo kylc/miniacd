@@ -37,29 +37,31 @@ mod pyminiacd {
     }
 
     #[pyfunction]
-    #[pyo3(signature=(mesh,
-                      threshold=0.1,
-                      iterations=150,
-                      max_depth=3,
-                      num_nodes=20,
-                      random_seed=42,
-                      print=true))]
+    #[pyo3(signature=(
+        mesh: "PyMesh",
+        threshold: "float" = 0.1,
+        mcts_iterations: "int" = 150,
+        mcts_depth: "int" = 3,
+        mcts_grid_nodes: "int" = 20,
+        mcts_random_seed: "int" = 42,
+        print: "bool" = true
+    ) -> "list[PyMesh]")]
     fn run(
         mesh: &PyMesh,
         threshold: f64,
-        iterations: usize,
-        max_depth: usize,
-        num_nodes: usize,
-        random_seed: u64,
+        mcts_iterations: usize,
+        mcts_depth: usize,
+        mcts_grid_nodes: usize,
+        mcts_random_seed: u64,
         print: bool,
     ) -> Vec<PyMesh> {
         let config = Config {
             threshold,
-            iterations,
-            max_depth,
-            exploration_param: f64::sqrt(2.0),
-            num_nodes,
-            random_seed,
+            mcts_iterations,
+            mcts_depth,
+            mcts_exploration: f64::sqrt(2.0),
+            mcts_grid_nodes,
+            mcts_random_seed,
             print,
         };
 
