@@ -51,6 +51,11 @@ jobs:
         with:
           name: wheels-binary-${{ matrix.os }}-${{ matrix.target }}
           path: dist
+      - if: github.ref == 'refs/heads/main'
+        name: update prerelease tag
+        uses: EndBug/latest-tag@v1.6.2
+        with:
+          ref: "prerelease"
 
   sdist:
     runs-on: ubuntu-latest
@@ -80,10 +85,7 @@ jobs:
           pattern: wheels-*
           merge-multiple: true
           path: wheels
-      - name: update prerelease tag
-        uses: EndBug/latest-tag@v1.6.2
-        with:
-          ref: "prerelease"
+
       - name: GitHub release
         uses: ncipollo/release-action@v1.14.0
         with:
