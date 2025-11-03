@@ -88,7 +88,7 @@ def main(
 
     # Run the miniacd algorithm.
     mesh = miniacd.Mesh(input_mesh.vertices, input_mesh.faces)
-    parts = miniacd.run(
+    hulls = miniacd.run(
         mesh,
         threshold=threshold,
         mcts_depth=mcts_depth,
@@ -98,24 +98,21 @@ def main(
         print=True,
     )
 
-    # Convexify the output slices.
-    parts = [part.convex_hull() for part in parts]
-
     # Build Trimesh objects from the miniacd meshes.
-    output_parts = [
+    output_hulls = [
         trimesh.Trimesh(
-            part.vertices(), part.faces(), vertex_colors=random_rgb(), process=False
+            hull.vertices(), hull.faces(), vertex_colors=random_rgb(), process=False
         )
-        for part in parts
+        for hull in hulls
     ]
 
     # Output a single file of multiple objects or multiple files.
     output_path = Path(output_path)
     if output_split:
-        for i, part in enumerate(output_parts):
-            part.export(output_path.with_stem(output_path.stem + f"_{i}"))
+        for i, hull in enumerate(output_hulls):
+            hull.export(output_path.with_stem(output_path.stem + f"_{i}"))
     else:
-        trimesh.Scene(output_parts).export(output_path)
+        trimesh.Scene(output_hulls).export(output_path)
 
 
 if __name__ == "__main__":

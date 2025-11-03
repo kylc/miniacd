@@ -99,7 +99,7 @@ fn run_inner(input: Part, config: &Config, progress: &ProgressBar, prev_cost: f6
     components
 }
 
-pub fn run(input: Mesh, config: &Config) -> Vec<Part> {
+pub fn run(input: Mesh, config: &Config) -> Vec<Mesh> {
     let progress_bar = ProgressBar::new(1)
         .with_message("Slicing parts...")
         .with_style(
@@ -127,7 +127,7 @@ pub fn run(input: Mesh, config: &Config) -> Vec<Part> {
     // Unapply the transform so the outputs part positions match the input.
     output_parts
         .into_iter()
-        .map(|p| Part::from_mesh(Arc::unwrap_or_clone(p.mesh).transform(&normalization_tfm_inv)))
-        .filter(|p| !p.mesh.is_empty())
+        .map(|p| Arc::unwrap_or_clone(p.convex_hull).transform(&normalization_tfm_inv))
+        .filter(|m| !m.is_empty())
         .collect()
 }
