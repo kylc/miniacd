@@ -348,16 +348,14 @@ fn quality_for_path(
     initial_state: &MctsState,
     actions: &[Action],
     replace_initial_action: Action,
-    max_depth: usize,
 ) -> f64 {
     let mut state = initial_state.clone();
-    let mut actions = actions.to_vec();
-    actions[0] = replace_initial_action;
 
-    for action in actions {
-        state = state.step(action);
+    state = state.step(replace_initial_action);
+    for action in &actions[1..] {
+        state = state.step(*action);
     }
-    state.simulate(max_depth)
+    state.quality()
 }
 
 /// Binary search for a refined cutting plane. Iteratively try cutting the input
@@ -366,45 +364,51 @@ fn quality_for_path(
 /// To evaluate the cut, the quality of the entire path with the first cut
 /// replaced by the left or right hand side from above is simulated. This
 /// prevents the refinement from being too greedy and reducing future reward.
-fn refine(
-    initial_state: &MctsState,
-    initial_path: &[Action],
-    unit_radius: f64,
-    max_depth: usize,
-) -> CanonicalPlane {
+fn refine(initial_state: &MctsState, initial_path: &[Action], unit_radius: f64) -> CanonicalPlane {
     // Each iteration cuts the search plane in half, so even in the worst case
     // (traversing the entire unit interval) this should converge in ~20 steps.
     const EPS: f64 = 1e-6;
 
     let initial_action = initial_path[0];
     let initial_unit_plane = initial_action.unit_plane;
+    let initial_q = quality_for_path(initial_state, initial_path, initial_path[0]);
 
     let mut lb = initial_unit_plane.bias - unit_radius;
     let mut ub = initial_unit_plane.bias + unit_radius;
     let mut best_action = initial_action;
 
     // Iterate until convergence.
+    let mut new_q = initial_q;
     while (ub - lb) > EPS {
         let pivot = (lb + ub) / 2.0;
 
         let lhs = Action::new(initial_unit_plane.with_bias((lb + pivot) / 2.));
         let rhs = Action::new(initial_unit_plane.with_bias((ub + pivot) / 2.));
 
+        let lhs_q = quality_for_path(initial_state, initial_path, lhs);
+        let rhs_q = quality_for_path(initial_state, initial_path, rhs);
+
         // Is left or right better?
-        if quality_for_path(initial_state, initial_path, lhs, max_depth)
-            > quality_for_path(initial_state, initial_path, rhs, max_depth)
-        {
+        if lhs_q > rhs_q {
             // Move left
             ub = pivot;
             best_action = lhs;
+            new_q = lhs_q;
         } else {
             // Move right
             lb = pivot;
             best_action = rhs;
+            new_q = rhs_q;
         }
     }
 
-    best_action.unit_plane
+    // TODO: Understand why the refined plane could be worse than the initial.
+    // Falling into a local minimum?
+    if new_q > initial_q {
+        best_action.unit_plane
+    } else {
+        initial_unit_plane
+    }
 }
 
 /// An implementation of Monte Carlo Tree Search for the approximate convex
@@ -447,16 +451,20 @@ pub fn run(input_part: &Part, config: &Config) -> Option<CanonicalPlane> {
     // Take the discrete best path from MCTS and refine it.
     let best_path = mcts.best_path_from_root();
     if !best_path.is_empty() {
+        let coarse_plane = best_path[0].unit_plane;
+        let lb = input_part.bounds.min[coarse_plane.axis];
+        let ub = input_part.bounds.max[coarse_plane.axis];
+
         let refined_plane = refine(
             // Start the refinement from the root state, i.e. just the input
             // part.
             &mcts.nodes[0].state,
             &best_path,
-            // TODO: use one node width scaled to mesh bbox
-            1.0,
-            config.mcts_depth,
+            // Refinement is only allowed to adjust within a single grid span.
+            1.0 / (config.mcts_grid_nodes + 1) as f64,
         );
-        Some(refined_plane)
+
+        Some(refined_plane.denormalize(lb, ub))
     } else {
         None
     }

@@ -74,11 +74,7 @@ fn run_inner(input: Part, config: &Config, progress: &ProgressBar, prev_cost: f6
     // Further slicing is necessary. Run the tree search to find the slice plane
     // which maximizes the future reward and also refine a more precise plane.
     let optimal_plane = mcts::run(&input, config).expect("no action");
-    let abs_optimal_plane = optimal_plane.denormalize(
-        input.bounds.min[optimal_plane.axis],
-        input.bounds.max[optimal_plane.axis],
-    );
-    let (lhs, rhs) = input.slice(abs_optimal_plane);
+    let (lhs, rhs) = input.slice(optimal_plane);
 
     // The input mesh is no longer required. Drop it to save on memory usage.
     drop(input);
