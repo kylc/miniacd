@@ -3,10 +3,7 @@ use std::{env, path::PathBuf, time::Instant};
 use miniacd::{
     Config,
     io::{self, load_obj},
-    mesh::Mesh,
-    ops::{self},
 };
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -31,11 +28,5 @@ fn main() {
     let tf = Instant::now();
     println!("main:\t{:.2}s", (tf - t0).as_secs_f64());
 
-    // PARALLEL: compute the output convex hulls in parallel.
-    let convex_meshes: Vec<Mesh> = components
-        .par_iter()
-        .map(|c| ops::convex_hull(&c.mesh))
-        .collect();
-
-    io::write_meshes_to_obj(&output_path, &convex_meshes).unwrap();
+    io::write_meshes_to_obj(&output_path, &components).unwrap();
 }

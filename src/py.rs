@@ -1,7 +1,5 @@
 #[pyo3::pymodule(name = "miniacd")]
 mod pyminiacd {
-    use std::sync::Arc;
-
     use nalgebra::Point3;
     use pyo3::prelude::*;
 
@@ -66,9 +64,6 @@ mod pyminiacd {
         };
 
         let components = crate::run(mesh.0.clone(), &config);
-        components
-            .into_iter()
-            .map(|c| PyMesh(Arc::unwrap_or_clone(c.mesh)))
-            .collect()
+        components.into_iter().map(PyMesh).collect()
     }
 }
