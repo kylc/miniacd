@@ -113,7 +113,7 @@ pub fn run(input: Mesh, config: &Config) -> Vec<Mesh> {
     // Some algorithm parameters depend on the mesh scaling, so it's important
     // to normalize.
     let normalization_tfm = input.normalization_transform();
-    let normalization_tfm_inv = normalization_tfm.try_inverse().unwrap();
+    let normalization_tfm_inv = normalization_tfm.inverse();
     let normalized_input = input.transform(&normalization_tfm);
 
     // Run the slicing algorithm.

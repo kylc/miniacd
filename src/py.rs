@@ -1,6 +1,6 @@
 #[pyo3::pymodule(name = "miniacd")]
 mod pyminiacd {
-    use nalgebra::Point3;
+    use glamx::DVec3;
     use pyo3::prelude::*;
 
     use crate::{Config, mesh::Mesh, ops};
@@ -15,7 +15,7 @@ mod pyminiacd {
             PyMesh(Mesh {
                 vertices: vertices
                     .into_iter()
-                    .map(|v| Point3::from_slice(&v))
+                    .map(|v| DVec3::from_slice(&v))
                     .collect(),
                 faces,
             })

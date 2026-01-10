@@ -1,7 +1,7 @@
 use std::collections::{VecDeque, hash_map::Entry};
 
 use ahash::AHashMap;
-use nalgebra::Point3;
+use glamx::DVec3;
 use parry3d_f64::utils::remove_unused_points;
 use spade::{ConstrainedDelaunayTriangulation, Triangulation};
 
@@ -12,7 +12,7 @@ const DEDUP_THRESHOLD: f64 = 1e-6;
 
 /// A plane with a normal pointing in one of the standard basis vectors, offset
 /// from the origin according to the bias.
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub struct CanonicalPlane {
     pub axis: usize,
     pub bias: f64,
@@ -41,7 +41,7 @@ impl CanonicalPlane {
     ///
     /// We can simplify this calculation because we are intersecting the line
     /// with a canonical plane.
-    pub fn line_intersection(&self, pa: &Point3<f64>, pb: &Point3<f64>) -> Option<Point3<f64>> {
+    pub fn line_intersection(&self, pa: &DVec3, pb: &DVec3) -> Option<DVec3> {
         let l = pb[self.axis] - pa[self.axis];
 
         // Line is parallel to plane?
@@ -57,7 +57,7 @@ impl CanonicalPlane {
     }
 
     /// Returns true if the point p is on the positive side of the plane.
-    pub fn above(&self, p: &Point3<f64>) -> bool {
+    pub fn above(&self, p: &DVec3) -> bool {
         p[self.axis] > self.bias
     }
 }
@@ -383,29 +383,29 @@ mod tests {
 
         assert!(
             plane
-                .line_intersection(&Point3::new(0.0, 0.0, 0.0), &Point3::new(1.0, 0.0, 0.0))
+                .line_intersection(&DVec3::new(0.0, 0.0, 0.0), &DVec3::new(1.0, 0.0, 0.0))
                 .is_none()
         );
         assert_relative_eq!(
             plane
-                .line_intersection(&Point3::new(0.0, 0.0, -0.5), &Point3::new(0.0, 0.0, 0.5))
+                .line_intersection(&DVec3::new(0.0, 0.0, -0.5), &DVec3::new(0.0, 0.0, 0.5))
                 .unwrap(),
-            Point3::new(0.0, 0.0, 0.25)
+            DVec3::new(0.0, 0.0, 0.25)
         );
         assert_relative_eq!(
             plane
-                .line_intersection(&Point3::new(1.0, 2.0, -0.5), &Point3::new(1.0, 2.0, 0.5))
+                .line_intersection(&DVec3::new(1.0, 2.0, -0.5), &DVec3::new(1.0, 2.0, 0.5))
                 .unwrap(),
-            Point3::new(1.0, 2.0, 0.25)
+            DVec3::new(1.0, 2.0, 0.25)
         );
         assert_relative_eq!(
             plane
                 .line_intersection(
-                    &Point3::new(-0.75, -0.75, -0.75),
-                    &Point3::new(1.25, 1.25, 1.25)
+                    &DVec3::new(-0.75, -0.75, -0.75),
+                    &DVec3::new(1.25, 1.25, 1.25)
                 )
                 .unwrap(),
-            Point3::new(0.25, 0.25, 0.25)
+            DVec3::new(0.25, 0.25, 0.25)
         );
     }
 
@@ -413,9 +413,9 @@ mod tests {
     fn test_dedup_vertices() {
         let mut mesh = Mesh::new(
             vec![
-                Point3::new(0., 0., 0.),
-                Point3::new(0., 0., 1e-10),
-                Point3::new(1e-10, 0., 0.0),
+                DVec3::new(0., 0., 0.),
+                DVec3::new(0., 0., 1e-10),
+                DVec3::new(1e-10, 0., 0.0),
             ],
             vec![[0, 1, 2]],
         );

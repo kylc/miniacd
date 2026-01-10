@@ -17,7 +17,7 @@ mod tests {
     use std::f64;
 
     use approx::assert_relative_eq;
-    use nalgebra::vector;
+    use glamx::DVec3;
     use parry3d_f64::shape::{Ball, Cuboid};
 
     use crate::mesh::Mesh;
@@ -26,7 +26,7 @@ mod tests {
 
     #[test]
     fn test_primitive_volumes() {
-        let cube = Cuboid::new(vector![1.0, 2.0, 3.0]).to_trimesh();
+        let cube = Cuboid::new(DVec3::new(1.0, 2.0, 3.0)).to_trimesh();
         let cube = Mesh::new(cube.0, cube.1);
         assert_relative_eq!(volume(&cube), 2.0 * 4.0 * 6.0, max_relative = 0.01);
 

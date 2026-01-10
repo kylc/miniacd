@@ -4,8 +4,8 @@ use std::{
     num::NonZeroUsize,
 };
 
+use glamx::{DVec2, DVec3};
 use kiddo::{ImmutableKdTree, SquaredEuclidean};
-use nalgebra::{Point3, Vector2};
 use parry3d_f64::{query::PointQuery, shape::Triangle};
 use rand::{
     Rng, SeedableRng,
@@ -41,13 +41,13 @@ pub fn compute_rv(a: &Mesh, b: &Mesh) -> f64 {
 /// Implemented via the parallelogram method: we sample a point on a
 /// parallelogram which contains the triangle. If the point is outside the
 /// triangle then we transform it to be inside, preserving the uniformity.
-fn sample_triangle_surface<R: Rng>(tri: &Triangle, rng: &mut R) -> Point3<f64> {
-    let mut u: Vector2<f64> = rng.random();
+fn sample_triangle_surface<R: Rng>(tri: &Triangle, rng: &mut R) -> DVec3 {
+    let mut u: DVec2 = rng.random();
 
     // Sample is in part of the parallelogram which is outside the triangle,
     // shift it back into the triangle.
-    if u.sum() > 1.0 {
-        u = Vector2::repeat(1.0) - u;
+    if u.element_sum() > 1.0 {
+        u = DVec2::splat(1.0) - u;
     }
 
     let ab = tri.b - tri.a;
@@ -59,7 +59,7 @@ fn sample_triangle_surface<R: Rng>(tri: &Triangle, rng: &mut R) -> Point3<f64> {
 
 /// A point sampled on the surface of a triangle which remembers its source
 /// triangle.
-struct PointInTriangle(Triangle, Point3<f64>);
+struct PointInTriangle(Triangle, DVec3);
 
 /// Sample uniform points from the surface of a mesh.
 ///
@@ -126,7 +126,7 @@ fn hausdorff_element(a: &[PointInTriangle], b: &[PointInTriangle]) -> f64 {
                 .map(|b_sample| {
                     let tri_in_b = &b[b_sample.item as usize].0;
 
-                    tri_in_b.distance_to_local_point(&a_pt, true)
+                    tri_in_b.distance_to_local_point(a_pt, true)
                 })
                 .min_by(|a, b| a.total_cmp(b))
         })
@@ -178,7 +178,7 @@ mod tests {
             let triangle = Triangle::new(rng.random(), rng.random(), rng.random());
             let p = sample_triangle_surface(&triangle, &mut rng);
 
-            assert!(triangle.distance_to_local_point(&p, true).abs() < 1e-10);
+            assert!(triangle.distance_to_local_point(p, true).abs() < 1e-10);
         }
     }
 
@@ -187,14 +187,14 @@ mod tests {
         let mut rng = ChaCha8Rng::seed_from_u64(42);
 
         let tri1 = Triangle::new(
-            Point3::new(-1., -1., 0.),
-            Point3::new(0., -0.1, 0.),
-            Point3::new(1., -1., 0.),
+            DVec3::new(-1., -1., 0.),
+            DVec3::new(0., -0.1, 0.),
+            DVec3::new(1., -1., 0.),
         );
         let tri2 = Triangle::new(
-            Point3::new(-1., 1., 0.),
-            Point3::new(0., 0.1, 0.),
-            Point3::new(1., 1., 0.),
+            DVec3::new(-1., 1., 0.),
+            DVec3::new(0., 0.1, 0.),
+            DVec3::new(1., 1., 0.),
         );
 
         // Nearest point on tri2 from any point in tri1 is (0, 0.1).
@@ -203,7 +203,7 @@ mod tests {
             let p2 = sample_triangle_surface(&tri2, &mut rng);
             assert_relative_eq!(
                 hausdorff_element(&[PointInTriangle(tri1, p1)], &[PointInTriangle(tri2, p2)]),
-                nalgebra::distance(&p1, &Point3::new(0., 0.1, 0.))
+                p1.distance(DVec3::new(0., 0.1, 0.))
             );
         }
     }

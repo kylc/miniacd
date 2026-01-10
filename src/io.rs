@@ -5,7 +5,7 @@ use std::{
     path::Path,
 };
 
-use nalgebra::Point3;
+use glamx::{DVec3, Vec3};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
@@ -25,11 +25,11 @@ pub fn load_obj<P: AsRef<Path> + Debug>(path: P) -> Vec<Mesh> {
     models
         .into_iter()
         .map(|model| {
-            let vertices: Vec<Point3<f64>> = model
+            let vertices: Vec<DVec3> = model
                 .mesh
                 .positions
                 .chunks_exact(3)
-                .map(|v| Point3::new(v[0] as f64, v[1] as f64, v[2] as f64))
+                .map(|v| Vec3::from_slice(v).as_dvec3())
                 .collect();
 
             let faces: Vec<[u32; 3]> = model

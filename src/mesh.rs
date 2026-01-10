@@ -1,4 +1,4 @@
-use nalgebra::{Matrix4, Point3};
+use glamx::{DAffine3, DVec3};
 use parry3d_f64::shape::Triangle;
 
 use crate::ops;
@@ -6,7 +6,7 @@ use crate::ops;
 /// A triangle mesh.
 #[derive(Clone)]
 pub struct Mesh {
-    pub vertices: Vec<Point3<f64>>,
+    pub vertices: Vec<DVec3>,
     pub faces: Vec<[u32; 3]>,
 }
 
@@ -18,7 +18,7 @@ impl Mesh {
         }
     }
 
-    pub fn new(vertices: Vec<Point3<f64>>, faces: Vec<[u32; 3]>) -> Mesh {
+    pub fn new(vertices: Vec<DVec3>, faces: Vec<[u32; 3]>) -> Mesh {
         Mesh { vertices, faces }
     }
 
@@ -62,22 +62,43 @@ impl Mesh {
 
     /// Transform such that the mesh is centered and on the range (-1, 1) along
     /// the longest extent.
-    pub fn normalization_transform(&self) -> Matrix4<f64> {
+    pub fn normalization_transform(&self) -> DAffine3 {
         let bbox = ops::bbox(self);
 
-        let tfm = Matrix4::identity();
-        let tfm = tfm.append_translation(&-bbox.center());
-        tfm.append_scaling(2. / bbox.extent().max())
+        DAffine3::from_scale(DVec3::splat(2. / bbox.extent().max_element()))
+            * DAffine3::from_translation(-bbox.center())
     }
 
-    pub fn transform(self, tfm: &Matrix4<f64>) -> Mesh {
+    pub fn transform(self, tfm: &DAffine3) -> Mesh {
         Mesh {
             vertices: self
                 .vertices
                 .into_iter()
-                .map(|pt| tfm.transform_point(&pt))
+                .map(|pt| tfm.transform_point3(pt))
                 .collect(),
             faces: self.faces,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use approx::assert_relative_eq;
+    use glamx::dvec3;
+
+    use super::*;
+
+    #[test]
+    fn test_normalization_transform() {
+        let vertices = vec![dvec3(1.0, 2.0, 4.0), dvec3(0.0, -2.0, -4.0)];
+        let triangles = vec![[0, 1, 2], [1, 2, 3]];
+
+        let mesh = Mesh::new(vertices, triangles);
+        let tfm = mesh.normalization_transform();
+
+        let unit_mesh = mesh.transform(&tfm);
+
+        assert_relative_eq!(&unit_mesh.vertices[0], &dvec3(0.125, 0.5, 1.0));
+        assert_relative_eq!(&unit_mesh.vertices[1], &dvec3(-0.125, -0.5, -1.0));
     }
 }
