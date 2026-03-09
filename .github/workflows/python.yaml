@@ -14,12 +14,16 @@ jobs:
         include:
           - os: ubuntu-24.04
             target: x86_64
+            interpreter: python3.9
           - os: ubuntu-24.04-arm
             target: aarch64
+            interpreter: python3.9
           - os: macos-15
             target: universal2
+            interpreter: python3
           - os: windows-2025
             target: x86_64
+            interpreter: python3
 
     steps:
       - name: checkout
@@ -33,7 +37,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --profile release-lto --out dist
+          args: --profile release-lto --out dist -i ${{ matrix.interpreter }}
           manylinux: auto
           sccache: true
       - name: delocate wheel (macOS)
