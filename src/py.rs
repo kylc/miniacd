@@ -38,6 +38,7 @@ mod pyminiacd {
     #[pyo3(signature=(
         mesh: "PyMesh",
         threshold: "float" = 0.1,
+        exhaustive: "bool" = false,
         mcts_iterations: "int" = 150,
         mcts_depth: "int" = 3,
         mcts_grid_nodes: "int" = 20,
@@ -47,6 +48,7 @@ mod pyminiacd {
     fn run(
         mesh: &PyMesh,
         threshold: f64,
+        exhaustive: bool,
         mcts_iterations: usize,
         mcts_depth: usize,
         mcts_grid_nodes: usize,
@@ -55,6 +57,7 @@ mod pyminiacd {
     ) -> Vec<PyMesh> {
         let config = Config {
             threshold,
+            exhaustive,
             mcts_iterations,
             mcts_depth,
             mcts_exploration: f64::sqrt(2.0),

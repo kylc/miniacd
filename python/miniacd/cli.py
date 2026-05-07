@@ -47,6 +47,12 @@ def random_rgb() -> tuple[int, int, int]:
     help="Concavity threshold at which mesh parts will be accepted",
 )
 @click.option(
+    "--exhaustive",
+    default=False,
+    is_flag=True,
+    help="Use the exhaustive search instead of MCTS. Note that this is very slow, but is useful for debugging.",
+)
+@click.option(
     "--mcts-iterations",
     default=150,
     type=click.IntRange(min=0),
@@ -76,6 +82,7 @@ def main(
     output_path: str,
     output_split: bool,
     threshold: float,
+    exhaustive: bool,
     mcts_depth: int,
     mcts_iterations: int,
     mcts_grid_nodes: int,
@@ -91,6 +98,7 @@ def main(
     hulls = miniacd.run(
         mesh,
         threshold=threshold,
+        exhaustive=exhaustive,
         mcts_depth=mcts_depth,
         mcts_iterations=mcts_iterations,
         mcts_grid_nodes=mcts_grid_nodes,
