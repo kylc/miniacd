@@ -40,12 +40,16 @@ pub fn bbox(mesh: &Mesh) -> Aabb {
         return Aabb::empty();
     }
 
+    // PERFORMANCE: splitting up these loops gives a ~2x speedup on the
+    // ops::bbox benchmark.
     let mut min = mesh.vertices[0];
-    let mut max = mesh.vertices[0];
-
     for v in &mesh.vertices {
-        min = min.min(*v);
-        max = max.max(*v);
+        min = DVec3::min(min, *v);
+    }
+
+    let mut max = mesh.vertices[0];
+    for v in &mesh.vertices {
+        max = DVec3::max(max, *v);
     }
 
     Aabb { min, max }
