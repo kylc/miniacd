@@ -17,7 +17,7 @@ ahash = "0.8.12"
 glamx = { version = "0.1.3", features = ["approx", "rand"] }
 indicatif = "0.18.0"
 kiddo = "5.2.2"
-mimalloc = { version = "0.1.48", features = ["v3"] }
+mimalloc = "0.1.50"
 parry3d-f64 = "0.26"
 pyo3 = { version = "0.28.0", features = ["abi3-py39", "experimental-inspect"] }
 rand = { version = "0.9.0", default-features = false, features = ["std"] }
