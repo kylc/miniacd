@@ -264,7 +264,7 @@ pub fn slice(input_mesh: &Mesh, plane: &CanonicalPlane) -> (Mesh, Mesh) {
         input_mesh.vertices.len() as u32,
         &mut top_mesh,
         Some(&mut edge_constraints),
-        1e-6,
+        DEDUP_THRESHOLD,
     );
     dedup_vertices(
         input_mesh.vertices.len() as u32,
