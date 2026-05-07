@@ -59,6 +59,11 @@ fn bbox(bencher: Bencher) {
     });
 }
 
+#[divan::bench]
+fn load_mesh(bencher: Bencher) {
+    bencher.bench(|| load_obj("benches/bunny.obj"));
+}
+
 #[divan::bench(sample_count = 3)]
 fn full_run(bencher: Bencher) {
     let mesh = &load_obj("benches/bunny.obj")[0];
