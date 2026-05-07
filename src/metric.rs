@@ -31,7 +31,7 @@ pub fn compute_rv(a: &Mesh, b: &Mesh) -> f64 {
     let a_vol = ops::volume(a);
     let b_vol = ops::volume(b);
 
-    let diff_vol = a_vol.abs() - b_vol.abs();
+    let diff_vol = b_vol - a_vol;
 
     f64::powf(3. * diff_vol.abs() / (4. * PI), 1. / 3.)
 }
