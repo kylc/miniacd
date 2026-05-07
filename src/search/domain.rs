@@ -131,7 +131,11 @@ impl State {
     /// gives a smaller cost. We aim to minimize the cost.
     pub fn cost(&self) -> f64 {
         assert_eq!(
-            self.parts.iter().map(|p| p.approx_concavity).max_by(|x, y| x.total_cmp(y)).unwrap(),
+            self.parts
+                .iter()
+                .map(|p| p.approx_concavity)
+                .max_by(|x, y| x.total_cmp(y))
+                .unwrap(),
             self.parts[self.worst_part_index()].approx_concavity
         );
 
